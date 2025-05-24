@@ -1,0 +1,97 @@
+#
+# Top level CMake config for haRness
+# - Builds R locally from the remote tarball
+# - Links the executable to the locally built version of R
+#
+# Assupmtions:
+# - Assumes the file/folder structure *does not* change.
+#   Exectuable has hardcoded RUNPATH to the shared R libraries
+#
+# TODO: Make the R shared library handling more robust. Currently
+#       just has hardcoded runpaths to all three shared libraries
+#       which means that libR.so cannot find libRblas.so except
+#       for the fact that all three are hardcoded to target_link_library
+#       at the end of this file.
+#
+#       Could either: give all three libraries relative rpath's to each
+#       other, or use system installations for everything, containerize
+#       later. Or static binary of course. 
+# 
+
+cmake_minimum_required(VERSION 3.15)
+project (haRness)
+
+include(ExternalProject)
+include(FetchContent)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(FETCHCONTENT_QUIET FALSE)
+
+add_compile_options(-Wall -Wextra -Wpedantic)
+
+# setup local build of R runtime from source
+# using 4.5.0 for now -- hardcoded link
+set(R_SOURCE_URL "https://cran.r-project.org/src/base/R-4/R-4.5.0.tar.gz")
+
+# fetch the source with FetchContent
+# also handles decompressing it, but doesn't build it
+# SHA1 checksum is hardcoded for 4.5.0 from R website.
+# if it gets updated it will fail
+FetchContent_Declare(r_source
+  URL "${R_SOURCE_URL}"
+  URL_HASH SHA1=509a6e78a0e48dcee00bc246fd86adb369f8c60e
+  DOWNLOAD_EXTRACT_TIMESTAMP NEW
+)
+
+FetchContent_MakeAvailable(r_source)
+
+set(R_INSTALL_DIR "${CMAKE_BINARY_DIR}/r-install")
+set(R_SOURCE_DIR "${r_source_SOURCE_DIR}")
+
+message(STATUS "R_SOURCE_DIR: ${R_SOURCE_DIR}")
+# diagnostic from above, the in place install
+message(STATUS "R_INSTALL_DIR: ${R_INSTALL_DIR}")
+
+# code below to parallel make R for faster build
+include(ProcessorCount)
+ProcessorCount(NPROCS)
+
+# build R using ExternalProject
+ExternalProject_Add(r-installation
+  SOURCE_DIR ${R_SOURCE_DIR}
+  DOWNLOAD_COMMAND ""
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${R_INSTALL_DIR} --enable-R-shlib
+  BUILD_IN_SOURCE 1
+  BUILD_COMMAND make -j${NPROCS}
+  INSTALL_COMMAND make install
+)
+
+# set variables for R to work, R_HOME will need to be set
+set(R_HOME "${R_INSTALL_DIR}/lib64/R")
+set(R_INCLUDE_DIR "${R_INSTALL_DIR}/lib64/R/include")
+set(R_LIB_DIR "${R_INSTALL_DIR}/lib64/R/lib")
+
+message(STATUS "R_INCLUDE_DIR: ${R_INCLUDE_DIR}")
+message(STATUS "R_LIB_DIR: ${R_LIB_DIR}")
+
+# actual harness code
+add_executable(haRness src/main.cpp)
+add_dependencies(haRness r-installation)
+
+# include the R headers to be accessible from haRness
+# just R for now. could add Rcpp later, or cpp11 maybe?
+target_include_directories(haRness PRIVATE
+  ${R_INCLUDE_DIR}
+)
+
+# target_link_libraries(haRness ${R_LIB_DIR}/libR.so ${R_LIB_DIR}/libRblas.so ${R_LIB_DIR}/libRlapack.so)
+ 
+target_link_libraries(haRness ${R_LIB_DIR}/libR.so)
+
+
+
+set_target_properties(haRness PROPERTIES
+  BUILD_WITH_INSTALL_RPATH TRUE
+  INSTALL_RPATH "${R_LIB_DIR}"
+)

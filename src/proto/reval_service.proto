@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/any.proto";
+
+service REvalService {
+  // Initial eval operation creator RPC
+  rpc EvalRScript(EvalRScriptRequest) returns (EvalOperation);
+
+  // get the status of a long-running R evaluation
+  rpc GetEvalOperation(GetEvalOperationRequest) returns (EvalOperation);
+
+  // attempt to cancel a long-running R evaluation, will attempt SIGINT
+  // R interruption
+  rpc CancelEvalOperation(CancelEvalOperationRequest) returns (google.protobuf.Empty);
+}
+
+message EvalRScriptRequest {
+  // actual R code
+  string r_code = 1;
+  // future parameters below, like an explicit time limit
+  // or ?
+}
+
+enum EvalStatus {
+  EVAL_UNSPECIFIED = 0;
+  EVAL_SUCCESS = 1;
+  EVAL_R_CODE_ERROR = 2;
+  EVAL_CPP_ERROR = 3;
+  EVAL_CANCELLED = 4;
+}
+
+message EvalErrorStatus {
+  // this is a copy of the google grpc/status/status.proto
+  // because the headers aren't in the normal grpc install
+  // and I am not including the whole of googleapis just to
+  // get a stupid fucking header
+  int32 code = 1;
+  string message = 2;
+  repeated google.protobuf.Any details = 3;
+}
+
+message EvalOperation {
+  string name = 1;
+  google.protobuf.Duration duration = 2;
+  bool done = 3;
+  oneof result {
+    EvalResult eval_result = 4;
+    EvalErrorStatus error = 5;
+  }
+}
+
+message GetEvalOperationRequest {
+  string name = 1;
+}
+
+message CancelEvalOperationRequest {
+  string name = 1;
+}
+
+message EvalResult {
+  EvalStatus status = 1;
+  repeated string interpreter_lines = 2;
+  repeated string svg_plots = 3;
+}
