@@ -1,7 +1,5 @@
 #include "r_result.h"
-#include <iomanip>
 #include <ostream>
-#include <stdexcept>
 #include <variant>
 
 namespace RWorker {
@@ -105,6 +103,38 @@ std::ostream &operator<<(std::ostream &os, const RResponse &response) {
 
   os << "}";       // End of RResponse object
   os << std::endl; // Add a final newline
+
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const ResponseStatus &response_status) {
+  switch (response_status) {
+    case ResponseStatus::SUCCESS:
+    os << "SUCCESS"; //
+    break;
+  case ResponseStatus::FAILURE_R_SCRIPT_ERROR:
+    os << "FAILURE_R_SCRIPT_ERROR"; //
+    break;
+  case ResponseStatus::FAILURE_R_VIEW_ERROR:
+    os << "FAILURE_R_VIEW_ERROR"; //
+    break;
+  case ResponseStatus::FAILURE_CPP_COMMAND:
+    os << "FAILURE_CPP_COMMAND"; //
+    break;
+  case ResponseStatus::FAILURE_TASK_EXECUTION:
+    os << "FAILURE_TASK_EXECUTION"; //
+    break;
+  case ResponseStatus::FAILURE_TIMEOUT:
+    os << "FAILURE_TIMEOUT"; //
+    break;
+  case ResponseStatus::FAILURE_INVALID_TASK:
+    os << "FAILURE_INVALID_TASK"; //
+    break;
+  default:
+    os << "UNKNOWN_RESPONSE_STATUS (value: "
+       << static_cast<int>(response_status) << ")"; //
+    break;
+  }
 
   return os;
 }

@@ -27,6 +27,9 @@ enum class ResponseStatus {
   FAILURE_INVALID_TASK
 };
 
+std::ostream &operator<<(std::ostream &os, const ResponseStatus &response_status);
+
+
 // result data containers
 struct RClientOutputPayload {
   // all of these should be in their output order based on the R code
