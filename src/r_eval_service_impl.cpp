@@ -200,11 +200,15 @@ void REvalServiceImpl::ProcessRResponseQueue(std::stop_token stop_token) {
                         }
                     }
                 });
+
+            // if there was a task we immediately get another
+            // if not we wait 20 milli
+            continue;
         }
 
         // sleep :)
         // this should possibly be configurable or a better solution be found?
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
     LOG(INFO) << "RResponse queue processing thread shutting down!";

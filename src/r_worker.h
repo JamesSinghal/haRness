@@ -8,6 +8,7 @@
 namespace RWorker {
 using namespace moodycamel;
 void r_worker_thread(
+    std::stop_token stop_token,
     ConcurrentQueue<std::unique_ptr<RTask>> &taskQueue,
     ConcurrentQueue<std::unique_ptr<RResponse>> &responseQueue);
 

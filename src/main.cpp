@@ -9,21 +9,34 @@
 #include "r_worker.h"
 #include <memory>
 #include <absl/log/log.h>
+#include <absl/log/initialize.h>
+#include <absl/log/globals.h>
 #include <grpcpp/grpcpp.h>
+#include <csignal>
 
 int main() {
   // namespace for ConcurrentQueue
   using namespace moodycamel;
   using namespace RWorker;
 
+  absl::InitializeLog();
+  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+
   LOG(INFO) << "haRness: main program starting up";
 
+  // stop source + token for the rworker thread
+  std::stop_source rworker_ssource;
+  std::stop_token rworker_stoken = rworker_ssource.get_token();
+
+  // global queues network <-> rworker
   ConcurrentQueue<std::unique_ptr<RTask>> taskQueue;
   ConcurrentQueue<std::unique_ptr<RResponse>> responseQueue;
+  // store for grpc to keep track of operations
   EvalOperationStore operationStore;
 
   // create worker thread before creating gRPC server
   std::thread rWorkerThread(RWorker::r_worker_thread,
+                            rworker_stoken,
                             std::ref(taskQueue),
                             std::ref(responseQueue));
 
@@ -41,10 +54,18 @@ int main() {
 
   LOG(INFO) << "gRPC Server Listening on " <<server_address;
 
+  // try to make custom sigint handler
+  //TODO: handling the reference passing will be more complex.
+  // we need to just have signal handler set some global variable
+  // and start the server in another thread, so that the main func
+  // can just block on the signal var and clean up here.
+
   server->Wait();
 
   // will block
-  rWorkerThread.join();
+  if (rWorkerThread.joinable()) {
+    rWorkerThread.join();
+  }
 
   return 0;
 }

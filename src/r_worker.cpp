@@ -33,6 +33,9 @@
 // concurrent queue include
 #include <concurrentqueue.h>
 
+// logging/check
+#include <absl/log/check.h>
+
 namespace RWorker {
 
 bool is_R_init = false;
@@ -40,6 +43,7 @@ bool is_R_init = false;
 using namespace moodycamel;
 
 void r_worker_thread(
+    std::stop_token stop_token,
     ConcurrentQueue<std::unique_ptr<RTask>> &taskQueue,
     ConcurrentQueue<std::unique_ptr<RResponse>> &responseQueue) {
   // set R_HOME and R_LIBS
@@ -73,46 +77,53 @@ void r_worker_thread(
     throw std::logic_error("R setup snippets did not run correctly");
   }
 
-  // TODO: actually write task handling
-  std::unique_ptr<RTask> task;
+  while (!stop_token.stop_requested()) {
+    // TODO: actually write task handling
+    std::unique_ptr<RTask> task;
 
-  while (taskQueue.try_dequeue(task)) {
-    std::cout << "R thread: time: "
-              << std::chrono::high_resolution_clock().now() << std::endl;
+    if (taskQueue.try_dequeue(task)) {
+      std::cout << "R thread: time: "
+                << std::chrono::high_resolution_clock().now() << std::endl;
 
-    if (task.get()) {
-      std::cout << "Valid ptr" << std::endl;
-      // std::cout << *task << std::endl;
+      if (task.get()) {
+        // std::cout << "Valid ptr" << std::endl;
+        // std::cout << *task << std::endl;
 
-      switch (task->get_type()) {
-      case TaskType::EXECUTE_R_CODE_CLIENT: {
-        std::string task_uuid = task->get_uuid();
-        TaskData task_data = task->get_data();
+        switch (task->get_type()) {
+        case TaskType::EXECUTE_R_CODE_CLIENT: {
+          std::string task_uuid = task->get_uuid();
+          TaskData task_data = task->get_data();
 
-        std::string r_code = std::get<RCodePayload>(task_data).code;
+          std::string r_code = std::get<RCodePayload>(task_data).code;
 
-        std::unique_ptr<RResponse> client_eval_response =
-            eval_client_R(r_code, task_uuid);
+          std::unique_ptr<RResponse> client_eval_response =
+              eval_client_R(r_code, task_uuid);
 
-        responseQueue.enqueue(std::move(client_eval_response));
-        break;
+          responseQueue.enqueue(std::move(client_eval_response));
+          break;
+        }
+        case TaskType::EXECUTE_R_CODE_MANAGEMENT:
+          break;
+        case TaskType::CPP_MANAGEMENT_TASK:
+          break;
+        default:
+          // should be unreachable
+          CHECK(false) << "RTask of unknown type";
+          break;
+        }
+
+      } else {
+        // use abseil check for invariant
+        CHECK(task.get()) << "RTask dequeue unique_ptr null";
       }
-      case TaskType::EXECUTE_R_CODE_MANAGEMENT:
-        break;
-      case TaskType::CPP_MANAGEMENT_TASK:
-        break;
-      default:
-        // should be unreachable
-        assert(false);
-        break;
-      }
 
-    } else {
-      std::cout << "nothing there in task" << std::endl;
+      // if there was a task, we continue to grab the next immediately
+      // if not we wait for 1 second
+      continue;
     }
 
     // artificial slowdown for debug
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
   // cleanup
