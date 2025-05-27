@@ -7,12 +7,11 @@
 #include "r_result.h"
 #include "r_task.h"
 #include "r_worker.h"
-#include <memory>
-#include <absl/log/log.h>
-#include <absl/log/initialize.h>
 #include <absl/log/globals.h>
+#include <absl/log/initialize.h>
+#include <absl/log/log.h>
 #include <grpcpp/grpcpp.h>
-#include <csignal>
+#include <memory>
 
 int main() {
   // namespace for ConcurrentQueue
@@ -20,7 +19,7 @@ int main() {
   using namespace RWorker;
 
   absl::InitializeLog();
-  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
+  absl::SetStderrThreshold(absl::LogSeverityAtLeast::kFatal);
 
   LOG(INFO) << "haRness: main program starting up";
 
@@ -35,27 +34,25 @@ int main() {
   EvalOperationStore operationStore;
 
   // create worker thread before creating gRPC server
-  std::thread rWorkerThread(RWorker::r_worker_thread,
-                            rworker_stoken,
-                            std::ref(taskQueue),
-                            std::ref(responseQueue));
+  std::thread rWorkerThread(RWorker::r_worker_thread, rworker_stoken,
+                            std::ref(taskQueue), std::ref(responseQueue));
 
-  REvalServiceImpl rEvalService(std::ref(operationStore),
-                                std::ref(taskQueue),
+  REvalServiceImpl rEvalService(std::ref(operationStore), std::ref(taskQueue),
                                 std::ref(responseQueue));
 
   std::string server_address("0.0.0.0:50051");
 
   grpc::ServerBuilder serverBuilder;
-  serverBuilder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+  serverBuilder.AddListeningPort(server_address,
+                                 grpc::InsecureServerCredentials());
 
   serverBuilder.RegisterService(&rEvalService);
   std::unique_ptr<grpc::Server> server(serverBuilder.BuildAndStart());
 
-  LOG(INFO) << "gRPC Server Listening on " <<server_address;
+  LOG(INFO) << "gRPC Server Listening on " << server_address;
 
   // try to make custom sigint handler
-  //TODO: handling the reference passing will be more complex.
+  // TODO: handling the reference passing will be more complex.
   // we need to just have signal handler set some global variable
   // and start the server in another thread, so that the main func
   // can just block on the signal var and clean up here.

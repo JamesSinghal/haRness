@@ -82,8 +82,8 @@ void r_worker_thread(
     std::unique_ptr<RTask> task;
 
     if (taskQueue.try_dequeue(task)) {
-      std::cout << "R thread: time: "
-                << std::chrono::high_resolution_clock().now() << std::endl;
+      // std::cout << "R thread: time: "
+      //          << std::chrono::high_resolution_clock().now() << std::endl;
 
       if (task.get()) {
         // std::cout << "Valid ptr" << std::endl;
@@ -123,7 +123,7 @@ void r_worker_thread(
     }
 
     // artificial slowdown for debug
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 
   // cleanup
