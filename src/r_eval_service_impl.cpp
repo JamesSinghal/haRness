@@ -213,7 +213,7 @@ void REvalServiceImpl::ProcessRResponseQueue(std::stop_token stop_token) {
 
     // sleep :)
     // this should possibly be configurable or a better solution be found?
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
 
   LOG(INFO) << "RResponse queue processing thread shutting down!";
